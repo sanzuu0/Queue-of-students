@@ -1,0 +1,126 @@
+version: '3.8'
+
+services:
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus/alert.rules:/etc/prometheus/alert.rules
+    ports:
+      - "9090:9090"
+    networks:
+      - monitoring
+    depends_on:
+      - alertmanager
+
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    ports:
+      - "3001:3000"
+    networks:
+      - monitoring
+    depends_on:
+      - prometheus
+
+  alertmanager:
+    image: prom/alertmanager
+    container_name: alertmanager
+    volumes:
+      - ./alertmanager/config.yml:/etc/alertmanager/config.yml
+    ports:
+      - "9093:9093"
+    networks:
+      - monitoring
+
+  postgres-exporter-auth:
+    image: wrouesnel/postgres-exporter
+    container_name: postgres-exporter-auth
+    environment:
+      DATA_SOURCE_NAME: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-auth:5432/auth_db?sslmode=disable"
+    networks:
+      - backend
+      - monitoring
+    depends_on:
+      - postgres-auth
+
+  postgres-exporter-user-profile:
+    image: wrouesnel/postgres-exporter
+    container_name: postgres-exporter-user-profile
+    environment:
+      DATA_SOURCE_NAME: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-user-profile:5432/user_profile_db?sslmode=disable"
+    networks:
+      - backend
+      - monitoring
+    depends_on:
+      - postgres-user-profile
+
+  postgres-exporter-permission:
+    image: wrouesnel/postgres-exporter
+    container_name: postgres-exporter-permission
+    environment:
+      DATA_SOURCE_NAME: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-permission:5432/permission_db?sslmode=disable"
+    networks:
+      - backend
+      - monitoring
+    depends_on:
+      - postgres-permission
+
+  mongodb-exporter-queue:
+    image: bitnami/mongodb-exporter:latest
+    container_name: mongodb-exporter-queue
+    environment:
+      MONGODB_URI: "mongodb://${MONGO_INITDB_ROOT_USERNAME}:${MONGO_INITDB_ROOT_PASSWORD}@mongo-queue:27017/queue_db"
+    networks:
+      - backend
+      - monitoring
+    depends_on:
+      - mongo-queue
+
+  redis-exporter-auth:
+    image: oliver006/redis_exporter
+    container_name: redis-exporter-auth
+    command: ["--redis.addr=redis://redis-auth:6379"]
+    ports:
+      - "9121:9121"
+    networks:
+      - backend
+      - monitoring
+    depends_on:
+      - redis-auth
+
+  redis-exporter-queue:
+    image: oliver006/redis_exporter
+    container_name: redis-exporter-queue
+    command: ["--redis.addr=redis://redis-queue:6379"]
+    ports:
+      - "9122:9121"
+    networks:
+      - backend
+      - monitoring
+    depends_on:
+      - redis-queue
+
+  redis-exporter-websocket:
+    image: oliver006/redis_exporter
+    container_name: redis-exporter-websocket
+    command: ["--redis.addr=redis://redis-websocket:6379"]
+    ports:
+      - "9123:9121"
+    networks:
+      - backend
+      - monitoring
+    depends_on:
+      - redis-websocket
+
+networks:
+  backend:
+    external: true
+  monitoring:
+
+volumes:
+  grafana-data:
